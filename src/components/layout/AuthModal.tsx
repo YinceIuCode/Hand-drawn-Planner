@@ -279,12 +279,22 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               style={{ backgroundColor: currentTheme.accent }}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-full text-white font-black text-base flex items-center justify-center shrink-0 shadow-xs"
-                  style={{ backgroundColor: currentTheme.primary }}
-                >
-                  {user.avatar || user.name.charAt(0).toUpperCase()}
-                </div>
+                {user.avatar && (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    referrerPolicy="no-referrer"
+                    className="w-11 h-11 rounded-full object-cover border border-black/80 shrink-0 shadow-xs"
+                  />
+                ) : (
+                  <div
+                    className="w-11 h-11 rounded-full text-white font-black text-base flex items-center justify-center shrink-0 shadow-xs overflow-hidden select-none"
+                    style={{ backgroundColor: currentTheme.primary }}
+                  >
+                    {((user.name || user.email || 'U').trim().charAt(0) || 'U').toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <h4 className="font-black text-sm truncate">{user.name}</h4>
                   <p className="text-xs opacity-75 truncate">{user.email}</p>

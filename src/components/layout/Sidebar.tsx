@@ -328,12 +328,22 @@ export default function Sidebar() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className="w-8 h-8 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs"
-                      style={{ backgroundColor: currentTheme.primary }}
-                    >
-                      {user.avatar || user.name.charAt(0).toUpperCase()}
-                    </div>
+                    {user.avatar && (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        referrerPolicy="no-referrer"
+                        className="w-8 h-8 rounded-full object-cover border border-black/80 shrink-0 shadow-xs"
+                      />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs overflow-hidden select-none"
+                        style={{ backgroundColor: currentTheme.primary }}
+                      >
+                        {((user.name || user.email || 'U').trim().charAt(0) || 'U').toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <span className="font-extrabold text-xs block truncate leading-tight">
                         {user.name}
@@ -575,12 +585,22 @@ export default function Sidebar() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="w-7 h-7 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs"
-                    style={{ backgroundColor: currentTheme.primary }}
-                  >
-                    {user.avatar || user.name.charAt(0).toUpperCase()}
-                  </div>
+                  {user.avatar && (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-full object-cover border border-black/80 shrink-0 shadow-xs"
+                    />
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs overflow-hidden select-none"
+                      style={{ backgroundColor: currentTheme.primary }}
+                    >
+                      {((user.name || user.email || 'U').trim().charAt(0) || 'U').toUpperCase()}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <span className="font-extrabold text-xs block truncate leading-tight">
                       {user.name}

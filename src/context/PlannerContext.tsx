@@ -611,6 +611,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       'User';
     const avatar =
       (sbUser.user_metadata?.avatar_url as string) ||
+      (sbUser.user_metadata?.picture as string) ||
       name.charAt(0).toUpperCase() ||
       'U';
 
