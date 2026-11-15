@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Solid sketch drop-shadow (offset to bottom-right/left) -->
+  <rect
+    x="11"
+    y="10"
+    width="48"
+    height="48"
+    rx="10"
+    transform="rotate(-2 35 34)"
+    fill="#14241d"
+  />
+  <!-- Main hand-drawn green card -->
+  <rect
+    x="8"
+    y="6"
+    width="48"
+    height="48"
+    rx="10"
+    transform="rotate(-2 32 30)"
+    fill="#0f6848"
+    stroke="#16251f"
+    stroke-width="3.5"
+    stroke-linejoin="round"
+  />
+  <!-- Bold White Letter P -->
+  <text
+    x="32"
+    y="31"
+    transform="rotate(-2 32 30)"
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="34"
+    font-weight="900"
+    fill="#ffffff"
+    text-anchor="middle"
+    dominant-baseline="central"
+  >P</text>
+</svg>

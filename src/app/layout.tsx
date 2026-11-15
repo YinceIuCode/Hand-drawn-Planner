@@ -16,7 +16,11 @@ export const metadata: Metadata = {
   title: "Hand-drawn Planner · Sổ tay vẽ tay & Kế hoạch cá nhân",
   description: "Sổ tay kỹ thuật số vẽ tay (Hand-drawn Digital Notebook) - Quản lý mục tiêu, kế hoạch tuần, theo dõi thói quen và thư giãn cùng nhạc Lofi.",
   icons: {
-    icon: "/favicon.ico?v=2",
+    icon: [
+      { url: "/icon.svg?v=3", type: "image/svg+xml" },
+      { url: "/favicon.ico?v=3" }
+    ],
+    apple: "/icon.svg?v=3"
   },
 };
 
