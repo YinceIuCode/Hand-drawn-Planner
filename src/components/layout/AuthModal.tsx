@@ -130,6 +130,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
           data: {
             full_name: finalName,
             name: finalName
