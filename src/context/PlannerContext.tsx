@@ -17,6 +17,7 @@ import {
   CHILL_PRESETS,
   playCelebrationSound,
   getTodayString,
+  DEFAULT_DATE_STR,
   addDaysToDate,
   getDayOfWeekTag,
   getFullDayOfWeekLabel,
@@ -25,9 +26,11 @@ import {
 } from '@/lib/constants';
 
 // ============================================================================
-// DỮ LIỆU MẪU ĐỒNG BỘ THEO THỜI GIAN THỰC
+// DỮ LIỆU MẪU ĐỒNG BỘ THEO THỜI GIAN THỰC (DÙNG NGÀY TĨNH ĐỂ PRERENDER AN TOÀN)
 // ============================================================================
-export const createInitialTasks = (today: string = getTodayString()): Task[] => {
+export const DEFAULT_STATIC_DATE = DEFAULT_DATE_STR;
+
+export const createInitialTasks = (today: string = DEFAULT_DATE_STR): Task[] => {
   const yesterday = addDaysToDate(today, -1);
   const twoDaysAgo = addDaysToDate(today, -2);
 
@@ -122,7 +125,7 @@ export const createInitialTasks = (today: string = getTodayString()): Task[] => 
   ];
 };
 
-export const createInitialHabits = (dayNum: number = new Date().getDate()): Habit[] => {
+export const createInitialHabits = (dayNum: number = 23): Habit[] => {
   const daysUpTo = (count: number) =>
     Array.from({ length: Math.min(Math.max(1, dayNum), count) }, (_, i) => i + 1);
 
@@ -166,8 +169,8 @@ export const createInitialHabits = (dayNum: number = new Date().getDate()): Habi
   ];
 };
 
-export const INITIAL_TASKS: Task[] = createInitialTasks();
-export const INITIAL_HABITS: Habit[] = createInitialHabits();
+export const INITIAL_TASKS: Task[] = createInitialTasks(DEFAULT_STATIC_DATE);
+export const INITIAL_HABITS: Habit[] = createInitialHabits(23);
 
 export const INITIAL_GOALS: Goal[] = [
   {
@@ -460,20 +463,11 @@ const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
 const priorityWeight: Record<string, number> = { urgent: 1, important: 2, normal: 3 };
 
 export function PlannerProvider({ children }: { children: ReactNode }) {
-  // Quản lý Ngày chọn thực tế
-  const [selectedDate, setSelectedDateState] = useState<string>(getTodayString());
+  // Quản lý Ngày chọn thực tế - khởi tạo tĩnh bằng DEFAULT_DATE_STR để SSR & Client khớp 100%
+  const [selectedDate, setSelectedDateState] = useState<string>(DEFAULT_DATE_STR);
 
-  // Quản lý Theme, Tab
-  const [themeId, setThemeId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_theme');
-        if (saved) return saved;
-      } catch {}
-    }
-    return 'bamboo';
-  });
-
+  // Quản lý Theme, Tab (khởi tạo tĩnh mặc định để Hydration-safe)
+  const [themeId, setThemeId] = useState<string>('bamboo');
   const [activeTab, setActiveTab] = useState<TabId>('today');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [showFloatingPalette, setShowFloatingPalette] = useState<boolean>(false);
@@ -482,66 +476,14 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const [showDataModal, setShowDataModal] = useState<boolean>(false);
 
   // Modal & Trạng thái Tài khoản người dùng (User & Auth)
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_current_user');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return null;
-  });
-
+  const [user, setUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
 
-  // State dữ liệu chính với Lazy Initializer từ localStorage
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedUserStr = localStorage.getItem('planner_current_user');
-        const initialEmail = savedUserStr ? JSON.parse(savedUserStr)?.email : null;
-        const key = initialEmail
-          ? `planner_data_${initialEmail.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')}_tasks`
-          : 'planner_tasks';
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          return syncRecurringTasks(getTodayString(), parsed);
-        }
-      } catch {}
-    }
-    return syncRecurringTasks(getTodayString(), INITIAL_TASKS);
-  });
-
-  const [habits, setHabits] = useState<Habit[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_habits');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return INITIAL_HABITS;
-  });
-
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_goals');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return INITIAL_GOALS;
-  });
-
-  const [yearly, setYearly] = useState<YearData>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_yearly');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return INITIAL_YEAR_DATA;
-  });
+  // State dữ liệu chính khởi tạo tĩnh (Hydration-safe 100%)
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [habits, setHabits] = useState<Habit[]>(INITIAL_HABITS);
+  const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
+  const [yearly, setYearly] = useState<YearData>(INITIAL_YEAR_DATA);
 
   // State form thêm việc ở tab Hôm nay
   const [newTaskTitle, setNewTaskTitle] = useState<string>('');
@@ -560,15 +502,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
 
   // State Trình phát nhạc Chill: Hỗ trợ cả YouTube Iframe ẩn & Web Audio Synth
   const [isPlayingMusic, setIsPlayingMusic] = useState<boolean>(false);
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('planner_youtube_id');
-        if (saved) return saved;
-      } catch {}
-    }
-    return 'jfKfPfyJRdk';
-  });
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>('jfKfPfyJRdk');
   const [musicSourceType, setMusicSourceType] = useState<'youtube' | 'synth'>('youtube');
   const [currentTrackTitle, setCurrentTrackTitle] = useState<string>(
     'Lofi Girl - Beats to relax/study'
@@ -597,6 +531,62 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       return nextDate;
     });
   };
+
+  // Cập nhật lại ngày hôm nay thực tế & nạp dữ liệu từ localStorage khi component đã mount trên client (tránh lỗi Hydration 100%)
+  useEffect(() => {
+    const mountTimer = setTimeout(() => {
+      try {
+        const today = getTodayString();
+        setSelectedDateState(today);
+
+        const savedTheme = localStorage.getItem('planner_theme');
+        if (savedTheme) setThemeId(savedTheme);
+
+        const savedUserStr = localStorage.getItem('planner_current_user');
+        let initialEmail: string | null = null;
+        if (savedUserStr) {
+          const parsedUser = JSON.parse(savedUserStr);
+          setUser(parsedUser);
+          initialEmail = parsedUser?.email || null;
+        }
+
+        const tasksKey = getUserStorageKey('tasks', initialEmail);
+        const habitsKey = getUserStorageKey('habits', initialEmail);
+        const goalsKey = getUserStorageKey('goals', initialEmail);
+        const yearlyKey = getUserStorageKey('yearly', initialEmail);
+
+        const savedTasks = localStorage.getItem(tasksKey);
+        if (savedTasks) {
+          setTasks(syncRecurringTasks(today, JSON.parse(savedTasks)));
+        } else {
+          setTasks((prev) => syncRecurringTasks(today, prev));
+        }
+
+        const savedHabits = localStorage.getItem(habitsKey);
+        if (savedHabits) {
+          setHabits(JSON.parse(savedHabits));
+        }
+
+        const savedGoals = localStorage.getItem(goalsKey);
+        if (savedGoals) {
+          setGoals(JSON.parse(savedGoals));
+        }
+
+        const savedYearly = localStorage.getItem(yearlyKey);
+        if (savedYearly) {
+          setYearly(JSON.parse(savedYearly));
+        }
+
+        const savedYoutube = localStorage.getItem('planner_youtube_id');
+        if (savedYoutube) {
+          setYoutubeVideoId(savedYoutube);
+        }
+      } catch {
+        // Ignore localStorage read errors
+      }
+    }, 0);
+    return () => clearTimeout(mountTimer);
+  }, []);
 
   // Lưu trạng thái vào localStorage khi state thay đổi (phân tách theo email nếu đã đăng nhập)
   // Trạng thái đồng bộ đám mây (Cloud Sync)
@@ -1171,7 +1161,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     return tasks.filter((t) => t.date < selectedDate && !t.completed);
   }, [tasks, selectedDate]);
 
-  const selectedDayNumber = parseInt(selectedDate.split('-')[2], 10) || new Date().getDate();
+  const selectedDayNumber = parseInt(selectedDate.split('-')[2], 10) || 23;
 
   const todayCompletionStats = useMemo(() => {
     const totalTasks = todaysTasks.length;

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Sparkles } from 'lucide-react';
 import { usePlanner, PlannerProvider } from '@/context/PlannerContext';
 import Sidebar from '@/components/layout/Sidebar';
@@ -112,9 +112,24 @@ function PlannerContent() {
 }
 
 export default function App() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!isMounted) {
+    return <div className="min-h-screen bg-grid-paper" />;
+  }
+
   return (
-    <PlannerProvider>
-      <PlannerContent />
-    </PlannerProvider>
+    <Suspense fallback={null}>
+      <PlannerProvider>
+        <PlannerContent />
+      </PlannerProvider>
+    </Suspense>
   );
 }

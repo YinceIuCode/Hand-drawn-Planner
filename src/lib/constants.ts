@@ -156,7 +156,9 @@ export const getTodayString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const TODAY_STR = getTodayString();
+export const DEFAULT_DATE_STR = '2026-10-23';
+export const DEFAULT_STATIC_DATE = DEFAULT_DATE_STR;
+export const TODAY_STR = DEFAULT_DATE_STR;
 
 /** Cộng/trừ số ngày vào một ngày cụ thể (YYYY-MM-DD) */
 export const addDaysToDate = (dateStr: string, days: number): string => {
