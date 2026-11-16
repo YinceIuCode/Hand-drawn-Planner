@@ -122,6 +122,7 @@ export interface CloudPlannerState {
   yearData: YearData;
   themeId: string;
   youtubeVideoId?: string | null;
+  lifeScores?: Record<string, number>;
   updatedAt?: string;
 }
 
@@ -134,4 +135,5 @@ export interface PlannerBackupData {
   goals: Goal[];
   yearly?: YearData;
   youtubeVideoId?: string | null;
+  lifeScores?: Record<string, number>;
 }

@@ -9,7 +9,7 @@ import React, {
   useEffect,
   ReactNode
 } from 'react';
-import { Task, Habit, Goal, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState } from '@/types/planner';
+import { Task, Habit, Goal, GoalStep, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState } from '@/types/planner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   THEMES,
@@ -22,7 +22,8 @@ import {
   getDayOfWeekTag,
   getFullDayOfWeekLabel,
   extractYouTubeVideoId,
-  calculateStreak
+  calculateStreak,
+  DEFAULT_LIFE_SCORES
 } from '@/lib/constants';
 
 // ============================================================================
@@ -394,6 +395,9 @@ export interface PlannerContextType {
   setYearData: React.Dispatch<React.SetStateAction<YearData>>;
   yearly: YearData;
   setYearly: React.Dispatch<React.SetStateAction<YearData>>;
+  lifeScores: Record<string, number>;
+  setLifeScores: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  updateLifeScore: (subject: string, score: number) => void;
 
   // Data Management Modal & Storage
   showDataModal: boolean;
@@ -438,8 +442,8 @@ export interface PlannerContextType {
   monthProgressRate: number;
   fullDayOfWeek: string;
 
-  // Handlers
-  addTask: (title?: string, priority?: string, recurrence?: string[]) => void;
+  // Handlers - Tasks
+  addTask: (title?: string, priority?: string, recurrence?: string[], targetDate?: string) => void;
   handleAddTask: (e: React.FormEvent) => void;
   toggleTask: (taskId: string) => void;
   handleToggleTask: (taskId: string) => void;
@@ -452,10 +456,28 @@ export interface PlannerContextType {
   handleMoveToTomorrow: (taskId: string) => void;
   rolloverOverdueTasks: () => void;
   handleRolloverOverdue: () => void;
+
+  // Handlers - Habits
   toggleHabitDate: (habitId: string, dayNum: number) => void;
   handleToggleHabitDay: (habitId: string, dayNum: number) => void;
   addHabit: (title: string) => void;
   handleAddHabit: (e: React.FormEvent) => void;
+  deleteHabit: (habitId: string) => void;
+  updateHabit: (habitId: string, newTitle: string) => void;
+
+  // Handlers - Goals
+  addGoal: (goal: Omit<Goal, 'id'>) => void;
+  updateGoal: (goalId: string, updated: Partial<Goal>) => void;
+  deleteGoal: (goalId: string) => void;
+  toggleGoalStep: (goalId: string, stepId: string) => void;
+  addGoalStep: (goalId: string, stepText: string) => void;
+  deleteGoalStep: (goalId: string, stepId: string) => void;
+
+  // Handlers - Yearly
+  addYearlyItem: (monthNum: number, text: string) => void;
+  deleteYearlyItem: (monthNum: number, itemId: string) => void;
+  toggleYearlyItem: (monthNum: number, itemId: string) => void;
+  updateYearlyMeta: (keyword: string, vision: string) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
@@ -484,6 +506,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>(INITIAL_HABITS);
   const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
   const [yearly, setYearly] = useState<YearData>(INITIAL_YEAR_DATA);
+  const [lifeScores, setLifeScores] = useState<Record<string, number>>(DEFAULT_LIFE_SCORES);
 
   // State form thêm việc ở tab Hôm nay
   const [newTaskTitle, setNewTaskTitle] = useState<string>('');
@@ -554,6 +577,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         const habitsKey = getUserStorageKey('habits', initialEmail);
         const goalsKey = getUserStorageKey('goals', initialEmail);
         const yearlyKey = getUserStorageKey('yearly', initialEmail);
+        const lifeScoresKey = getUserStorageKey('life_scores', initialEmail);
 
         const savedTasks = localStorage.getItem(tasksKey);
         if (savedTasks) {
@@ -575,6 +599,11 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         const savedYearly = localStorage.getItem(yearlyKey);
         if (savedYearly) {
           setYearly(JSON.parse(savedYearly));
+        }
+
+        const savedLifeScores = localStorage.getItem(lifeScoresKey);
+        if (savedLifeScores) {
+          setLifeScores(JSON.parse(savedLifeScores));
         }
 
         const savedYoutube = localStorage.getItem('planner_youtube_id');
@@ -666,6 +695,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         if (cloud.youtubeVideoId) {
           setYoutubeVideoId(cloud.youtubeVideoId);
         }
+        if (cloud.lifeScores && typeof cloud.lifeScores === 'object') {
+          setLifeScores(cloud.lifeScores);
+        }
 
         setSyncStatus('synced');
         triggerToast(`☁️ Đã đồng bộ dữ liệu đám mây cho ${name}!`);
@@ -678,6 +710,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           yearData: yearly,
           themeId,
           youtubeVideoId,
+          lifeScores,
           updatedAt: new Date().toISOString()
         };
 
@@ -744,12 +777,14 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       const habitsKey = getUserStorageKey('habits', email);
       const goalsKey = getUserStorageKey('goals', email);
       const yearlyKey = getUserStorageKey('yearly', email);
+      const lifeScoresKey = getUserStorageKey('life_scores', email);
       const themeKey = getUserStorageKey('theme', email);
 
       localStorage.setItem(tasksKey, JSON.stringify(tasks));
       localStorage.setItem(habitsKey, JSON.stringify(habits));
       localStorage.setItem(goalsKey, JSON.stringify(goals));
       localStorage.setItem(yearlyKey, JSON.stringify(yearly));
+      localStorage.setItem(lifeScoresKey, JSON.stringify(lifeScores));
       localStorage.setItem(themeKey, themeId);
       if (youtubeVideoId) localStorage.setItem('planner_youtube_id', youtubeVideoId);
 
@@ -759,6 +794,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('planner_habits', JSON.stringify(habits));
         localStorage.setItem('planner_goals', JSON.stringify(goals));
         localStorage.setItem('planner_yearly', JSON.stringify(yearly));
+        localStorage.setItem('planner_life_scores', JSON.stringify(lifeScores));
         localStorage.setItem('planner_theme', themeId);
       }
     } catch {
@@ -791,6 +827,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           yearData: yearly,
           themeId,
           youtubeVideoId,
+          lifeScores,
           updatedAt: new Date().toISOString()
         };
 
@@ -821,7 +858,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, user]);
+  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, lifeScores, user]);
 
   // Đăng nhập người dùng cục bộ (dành cho fallback offline hoặc khi chưa có mạng)
   const login = (email: string, name: string) => {
@@ -923,6 +960,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         yearData: yearly,
         themeId,
         youtubeVideoId,
+        lifeScores,
         updatedAt: new Date().toISOString()
       };
       const { error } = await supabase.from('user_planner_data').upsert(
@@ -1075,7 +1113,8 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         habits,
         goals,
         yearly,
-        youtubeVideoId
+        youtubeVideoId,
+        lifeScores
       };
       const jsonStr = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -1106,6 +1145,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       if (parsed.yearly && Array.isArray(parsed.yearly.months)) setYearly(parsed.yearly);
       if (parsed.themeId && typeof parsed.themeId === 'string') setThemeId(parsed.themeId);
       if (parsed.youtubeVideoId) setYoutubeVideoId(parsed.youtubeVideoId);
+      if (parsed.lifeScores && typeof parsed.lifeScores === 'object') setLifeScores(parsed.lifeScores);
 
       triggerToast('Đã khôi phục dữ liệu từ file sao lưu thành công!');
       return true;
@@ -1123,6 +1163,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setHabits(newHabits);
     setGoals(INITIAL_GOALS);
     setYearly(INITIAL_YEAR_DATA);
+    setLifeScores(DEFAULT_LIFE_SCORES);
     setSelectedDate(today);
     triggerToast('Đã khôi phục toàn bộ dữ liệu mẫu ban đầu!');
   };
@@ -1131,6 +1172,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setTasks([]);
     setHabits([]);
     setGoals([]);
+    setLifeScores(DEFAULT_LIFE_SCORES);
     setYearly({
       keyword: 'Mục tiêu mới',
       vision: 'Bắt đầu ghi chép kế hoạch cá nhân của bạn...',
@@ -1141,7 +1183,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         items: []
       }))
     });
-    triggerToast('Đã xóa trắng dữ liệu. Chúc bạn khởi đầu mới thuận lợi!');
+    triggerToast('Đã xóa trắng toàn bộ dữ liệu mẫu! Sổ tay đã sẵn sàng cho kế hoạch của bạn.');
   };
 
   // ============================================================================
@@ -1194,25 +1236,28 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   // ============================================================================
   // HANDLERS CÔNG VIỆC VÀ THÓI QUEN
   // ============================================================================
-  const addTask = (title?: string, priority?: string, recurrence?: string[]) => {
+  const addTask = (title?: string, priority?: string, recurrence?: string[], targetDate?: string) => {
     const finalTitle = title !== undefined ? title : newTaskTitle;
     const finalPriority = priority !== undefined ? priority : newTaskPriority;
     const finalRecurrence = recurrence !== undefined ? recurrence : newTaskRecurrence;
+    const finalDate = targetDate !== undefined ? targetDate : selectedDate;
 
     if (!finalTitle.trim()) return;
     const newTask: Task = {
       id: 't_' + Date.now(),
       title: finalTitle.trim(),
-      date: selectedDate,
+      date: finalDate,
       completed: false,
       priority: finalPriority,
       recurrence: finalRecurrence,
       subtasks: []
     };
     setTasks((prev) => [newTask, ...prev]);
-    setNewTaskTitle('');
-    setNewTaskPriority('normal');
-    setNewTaskRecurrence([]);
+    if (title === undefined) {
+      setNewTaskTitle('');
+      setNewTaskPriority('normal');
+      setNewTaskRecurrence([]);
+    }
     triggerToast('Đã thêm việc mới vào danh sách!');
   };
 
@@ -1361,6 +1406,167 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     addHabit(newHabitTitle);
   };
 
+  const deleteHabit = (habitId: string) => {
+    setHabits((prev) => prev.filter((h) => h.id !== habitId));
+    triggerToast('Đã xóa thói quen!');
+  };
+
+  const updateHabit = (habitId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    setHabits((prev) =>
+      prev.map((h) => (h.id === habitId ? { ...h, title: newTitle.trim() } : h))
+    );
+    triggerToast('Đã đổi tên thói quen!');
+  };
+
+  // ============================================================================
+  // HANDLERS MỤC TIÊU (GOALS) & BƯỚC NHỎ (STEPS) & RADAR CHÂM ĐIỂM
+  // ============================================================================
+  const updateLifeScore = (subject: string, score: number) => {
+    setLifeScores((prev) => ({
+      ...prev,
+      [subject]: Math.max(0, Math.min(100, score))
+    }));
+  };
+
+  const addGoal = (goalData: Omit<Goal, 'id'>) => {
+    const newGoal: Goal = {
+      ...goalData,
+      id: 'g_' + Date.now(),
+      steps: goalData.steps || []
+    };
+    setGoals((prev) => [newGoal, ...prev]);
+    triggerToast('Đã thêm mục tiêu mới!');
+  };
+
+  const updateGoal = (goalId: string, updated: Partial<Goal>) => {
+    setGoals((prev) =>
+      prev.map((g) => (g.id === goalId ? { ...g, ...updated } : g))
+    );
+    triggerToast('Đã cập nhật mục tiêu!');
+  };
+
+  const deleteGoal = (goalId: string) => {
+    setGoals((prev) => prev.filter((g) => g.id !== goalId));
+    triggerToast('Đã xóa mục tiêu!');
+  };
+
+  const toggleGoalStep = (goalId: string, stepId: string) => {
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const updatedSteps = g.steps.map((s) =>
+          s.id === stepId ? { ...s, done: !s.done } : s
+        );
+        const allDone = updatedSteps.length > 0 && updatedSteps.every((s) => s.done);
+        if (allDone && g.status !== 'Đã hoàn thành') {
+          playCelebrationSound();
+          triggerToast(`🎉 Chúc mừng bạn đã hoàn thành mục tiêu "${g.title}"!`);
+        }
+        return {
+          ...g,
+          steps: updatedSteps,
+          status: allDone ? 'Đã hoàn thành' : 'Đang thực hiện'
+        };
+      })
+    );
+  };
+
+  const addGoalStep = (goalId: string, stepText: string) => {
+    if (!stepText.trim()) return;
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const newStep: GoalStep = {
+          id: 'gs_' + Date.now(),
+          text: stepText.trim(),
+          done: false
+        };
+        const updatedSteps = [...g.steps, newStep];
+        return {
+          ...g,
+          steps: updatedSteps,
+          status: 'Đang thực hiện'
+        };
+      })
+    );
+    triggerToast('Đã thêm bước nhỏ mới!');
+  };
+
+  const deleteGoalStep = (goalId: string, stepId: string) => {
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const updatedSteps = g.steps.filter((s) => s.id !== stepId);
+        const allDone = updatedSteps.length > 0 && updatedSteps.every((s) => s.done);
+        return {
+          ...g,
+          steps: updatedSteps,
+          status: allDone ? 'Đã hoàn thành' : (updatedSteps.length === 0 ? g.status : 'Đang thực hiện')
+        };
+      })
+    );
+    triggerToast('Đã xóa bước nhỏ!');
+  };
+
+  // ============================================================================
+  // HANDLERS KẾ HOẠCH NĂM (YEARLY)
+  // ============================================================================
+  const addYearlyItem = (monthNum: number, text: string) => {
+    if (!text.trim()) return;
+    setYearly((prev) => {
+      const updatedMonths = prev.months.map((m) => {
+        if (m.month !== monthNum) return m;
+        const newItems = [...m.items, { id: 'yi_' + Date.now(), text: text.trim(), done: false }];
+        return {
+          ...m,
+          items: newItems,
+          total: newItems.length
+        };
+      });
+      return { ...prev, months: updatedMonths };
+    });
+    triggerToast(`Đã thêm mục tiêu Tháng ${monthNum}!`);
+  };
+
+  const deleteYearlyItem = (monthNum: number, itemId: string) => {
+    setYearly((prev) => {
+      const updatedMonths = prev.months.map((m) => {
+        if (m.month !== monthNum) return m;
+        const newItems = m.items.filter((it) => it.id !== itemId);
+        const doneCount = newItems.filter((it) => it.done).length;
+        return {
+          ...m,
+          items: newItems,
+          total: newItems.length,
+          done: doneCount
+        };
+      });
+      return { ...prev, months: updatedMonths };
+    });
+    triggerToast('Đã xóa mục tiêu tháng!');
+  };
+
+  const toggleYearlyItem = (monthNum: number, itemId: string) => {
+    setYearly((prev) => {
+      const updatedMonths = prev.months.map((m) => {
+        if (m.month !== monthNum) return m;
+        const newItems = m.items.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it));
+        const doneCount = newItems.filter((it) => it.done).length;
+        return {
+          ...m,
+          items: newItems,
+          done: doneCount
+        };
+      });
+      return { ...prev, months: updatedMonths };
+    });
+  };
+
+  const updateYearlyMeta = (keyword: string, vision: string) => {
+    setYearly((prev) => ({ ...prev, keyword, vision }));
+  };
+
   const value: PlannerContextType = {
     themeId,
     setThemeId,
@@ -1412,6 +1618,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setYearData: setYearly,
     yearly,
     setYearly,
+    lifeScores,
+    setLifeScores,
+    updateLifeScore,
     showDataModal,
     setShowDataModal,
     exportPlannerData,
@@ -1459,7 +1668,19 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     toggleHabitDate,
     handleToggleHabitDay,
     addHabit,
-    handleAddHabit
+    handleAddHabit,
+    deleteHabit,
+    updateHabit,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    toggleGoalStep,
+    addGoalStep,
+    deleteGoalStep,
+    addYearlyItem,
+    deleteYearlyItem,
+    toggleYearlyItem,
+    updateYearlyMeta
   };
 
   return <PlannerContext.Provider value={value}>{children}</PlannerContext.Provider>;

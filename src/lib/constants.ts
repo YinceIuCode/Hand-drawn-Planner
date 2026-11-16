@@ -138,7 +138,31 @@ export const GOAL_CATEGORIES = [
   'Tài chính',
   'Phát triển',
   'Sự nghiệp',
-  'Gia đình'
+  'Gia đình',
+  'Quan hệ',
+  'Sở thích'
+] as const;
+
+export const DEFAULT_LIFE_SCORES: Record<string, number> = {
+  'Sức khỏe': 65,
+  'Tài chính': 55,
+  'Sự nghiệp': 80,
+  'Phát triển': 70,
+  'Quan hệ': 45,
+  'Học tập': 75,
+  'Gia đình': 60,
+  'Sở thích': 50
+};
+
+export const LIFE_AREAS = [
+  'Sức khỏe',
+  'Tài chính',
+  'Sự nghiệp',
+  'Phát triển',
+  'Quan hệ',
+  'Học tập',
+  'Gia đình',
+  'Sở thích'
 ] as const;
 
 export const DAYS_OF_WEEK_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;

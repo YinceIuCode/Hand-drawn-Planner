@@ -104,14 +104,14 @@ export default function DataManagementModal({ isOpen, onClose }: DataManagementM
               />
               <span>
                 {confirmMode === 'clear'
-                  ? 'Xác nhận xóa trắng toàn bộ dữ liệu?'
-                  : 'Xác nhận khôi phục dữ liệu mẫu ban đầu?'}
+                  ? 'Xác nhận xóa toàn bộ dữ liệu mẫu (Làm mới sổ tay)?'
+                  : 'Xác nhận khôi phục lại dữ liệu mẫu ban đầu?'}
               </span>
             </div>
             <p className="text-[11px] opacity-80 leading-relaxed">
               {confirmMode === 'clear'
-                ? 'Thao tác này sẽ xóa sạch danh sách việc, thói quen và mục tiêu hiện có để bạn bắt đầu ghi chép từ con số 0. Hãy xuất file sao lưu trước nếu cần!'
-                : 'Thao tác này sẽ thay thế dữ liệu hiện tại bằng bộ dữ liệu mẫu đầy đủ để bạn trải nghiệm và tham khảo mẫu.'}
+                ? 'Thao tác này sẽ xóa sạch toàn bộ công việc, thói quen, mục tiêu mẫu mặc định để bạn bắt đầu sổ tay trắng của riêng mình. Dữ liệu mới sẽ tự động đồng bộ lên đám mây!'
+                : 'Thao tác này sẽ thiết lập lại sổ tay về bộ dữ liệu mẫu đầy đủ để bạn trải nghiệm và tham khảo mẫu.'}
             </p>
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
@@ -127,7 +127,7 @@ export default function DataManagementModal({ isOpen, onClose }: DataManagementM
                   backgroundColor: confirmMode === 'clear' ? '#e11d48' : currentTheme.primary
                 }}
               >
-                Tiếp tục thực hiện
+                {confirmMode === 'clear' ? 'Xác nhận xóa sạch' : 'Khôi phục ngay'}
               </button>
             </div>
           </div>
@@ -181,24 +181,23 @@ export default function DataManagementModal({ isOpen, onClose }: DataManagementM
 
             {/* 3. Đặt lại / Xóa trắng */}
             <div className="pt-2 border-t border-dashed border-gray-200 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => setConfirmMode('reset')}
-                  className="flex-1 sketch-btn py-2 px-2 bg-white hover:bg-gray-50 text-[11px] font-bold flex items-center justify-center gap-1.5 opacity-80 hover:opacity-100"
-                  title="Khôi phục lại bộ công việc và mục tiêu mẫu"
-                >
-                  <RotateCcw className="w-3 h-3 text-amber-600" />
-                  <span>Dữ liệu mẫu ban đầu</span>
-                </button>
-                <button
-                  onClick={() => setConfirmMode('clear')}
-                  className="flex-1 sketch-btn py-2 px-2 bg-white hover:bg-rose-50 text-[11px] font-bold text-rose-600 flex items-center justify-center gap-1.5 hover:border-rose-400"
-                  title="Xóa toàn bộ để ghi chép từ con số 0"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Xóa trắng (Bắt đầu từ 0)</span>
-                </button>
-              </div>
+              <button
+                onClick={() => setConfirmMode('clear')}
+                className="w-full sketch-btn py-2.5 px-3 bg-rose-50/70 hover:bg-rose-100/80 text-xs font-bold text-rose-700 border-rose-300 flex items-center justify-center gap-2 transition-colors"
+                title="Xóa toàn bộ việc, thói quen và mục tiêu mẫu để bắt đầu sổ tay trắng"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa toàn bộ dữ liệu mẫu (Làm mới sổ tay)</span>
+              </button>
+
+              <button
+                onClick={() => setConfirmMode('reset')}
+                className="w-full sketch-btn py-1.5 px-2 bg-white hover:bg-gray-50 text-[11px] font-bold text-gray-600 flex items-center justify-center gap-1.5 opacity-70 hover:opacity-100"
+                title="Khôi phục lại bộ công việc và mục tiêu mẫu ban đầu"
+              >
+                <RotateCcw className="w-3 h-3 text-amber-600" />
+                <span>Khôi phục lại dữ liệu mẫu ban đầu</span>
+              </button>
             </div>
           </div>
         )}
