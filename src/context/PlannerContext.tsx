@@ -623,13 +623,17 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHydratingRef = useRef<boolean>(false);
   const isCloudConfigured = isSupabaseConfigured;
+  const loadedUserIdRef = useRef<string | null>(null);
 
   // Xử lý nạp hoặc khởi tạo dữ liệu Supabase khi user đăng nhập
-  const handleSupabaseUser = async (sbUser: {
-    id: string;
-    email?: string | null;
-    user_metadata?: Record<string, unknown>;
-  }) => {
+  const handleSupabaseUser = async (
+    sbUser: {
+      id: string;
+      email?: string | null;
+      user_metadata?: Record<string, unknown>;
+    },
+    shouldNotify: boolean = false
+  ) => {
     if (!supabase || !sbUser.email) return;
 
     const email = sbUser.email;
@@ -700,7 +704,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         }
 
         setSyncStatus('synced');
-        triggerToast(`☁️ Đã đồng bộ dữ liệu đám mây cho ${name}!`);
+        if (shouldNotify) {
+          triggerToast(`☁️ Đã đồng bộ dữ liệu đám mây cho ${name}!`);
+        }
       } else {
         // Tài khoản mới tinh chưa có dòng nào trên Cloud -> tự động upsert dữ liệu hiện tại lên Cloud
         const initialCloudState: CloudPlannerState = {
@@ -729,7 +735,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           setSyncStatus('error');
         } else {
           setSyncStatus('synced');
-          triggerToast(`🎉 Đã liên kết tài khoản & lưu dữ liệu đám mây!`);
+          if (shouldNotify) {
+            triggerToast(`🎉 Đã liên kết tài khoản & lưu dữ liệu đám mây!`);
+          }
         }
       }
     } catch (err) {
@@ -745,7 +753,10 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     // 1. Kiểm tra session hiện tại khi mở web
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        handleSupabaseUser(session.user);
+        if (loadedUserIdRef.current !== session.user.id) {
+          loadedUserIdRef.current = session.user.id;
+          handleSupabaseUser(session.user, false);
+        }
       }
     });
 
@@ -753,11 +764,51 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await handleSupabaseUser(session.user);
-      } else if (event === 'SIGNED_OUT') {
+      // Bỏ qua sự kiện TOKEN_REFRESHED khi focus lại tab trình duyệt
+      if (event === 'TOKEN_REFRESHED') {
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        loadedUserIdRef.current = null;
         setUser(null);
         setSyncStatus('idle');
+        return;
+      }
+
+      if (session?.user) {
+        // Nếu user ID đã được tải trước đó thì KHÔNG gọi lại fetch dữ liệu và KHÔNG toast
+        if (loadedUserIdRef.current === session.user.id) {
+          // Chỉ cập nhật nhẹ thông tin user nếu cần
+          const email = session.user.email || '';
+          const name =
+            (session.user.user_metadata?.full_name as string) ||
+            (session.user.user_metadata?.name as string) ||
+            email.split('@')[0] ||
+            'User';
+          const avatar =
+            (session.user.user_metadata?.avatar_url as string) ||
+            (session.user.user_metadata?.picture as string) ||
+            name.charAt(0).toUpperCase() ||
+            'U';
+
+          setUser((prev) =>
+            prev?.id === session.user.id
+              ? { ...prev, email, name, avatar }
+              : {
+                  id: session.user.id,
+                  email,
+                  name,
+                  avatar,
+                  loggedInAt: new Date().toISOString()
+                }
+          );
+          return;
+        }
+
+        // Lần đầu tiên mở web lên hoặc vừa đổi tài khoản mới
+        loadedUserIdRef.current = session.user.id;
+        handleSupabaseUser(session.user, false);
       }
     });
 
@@ -924,6 +975,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
 
   // Đăng xuất tài khoản
   const logout = async () => {
+    loadedUserIdRef.current = null;
     if (supabase) {
       try {
         await supabase.auth.signOut();
