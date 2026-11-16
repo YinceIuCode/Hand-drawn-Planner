@@ -9,7 +9,7 @@ import React, {
   useEffect,
   ReactNode
 } from 'react';
-import { Task, Habit, Goal, GoalStep, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState, NotificationSettings } from '@/types/planner';
+import { Task, Habit, Goal, GoalStep, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState, NotificationSettings, CustomTrack } from '@/types/planner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   THEMES,
@@ -383,7 +383,11 @@ export interface PlannerContextType {
   showMusicPopover: boolean;
   setShowMusicPopover: React.Dispatch<React.SetStateAction<boolean>>;
   playPresetTrack: (presetId: string) => void;
-  playCustomYoutubeUrl: (url: string) => boolean;
+  playCustomYoutubeUrl: (url: string, customTitle?: string) => boolean;
+  customTracks: CustomTrack[];
+  setCustomTracks: React.Dispatch<React.SetStateAction<CustomTrack[]>>;
+  removeCustomTrack: (id: string) => void;
+  playCustomTrack: (track: CustomTrack) => void;
 
   // Data
   tasks: Task[];
@@ -554,6 +558,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const [currentTrackTitle, setCurrentTrackTitle] = useState<string>(
     'Lofi Girl - Beats to relax/study'
   );
+  const [customTracks, setCustomTracks] = useState<CustomTrack[]>([]);
   const [showMusicPopover, setShowMusicPopover] = useState<boolean>(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -644,6 +649,20 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         const savedYoutube = localStorage.getItem('planner_youtube_id');
         if (savedYoutube) {
           setYoutubeVideoId(savedYoutube);
+        }
+        const savedTrackTitle = localStorage.getItem('planner_track_title');
+        if (savedTrackTitle) {
+          setCurrentTrackTitle(savedTrackTitle);
+        }
+        const savedMusicSourceType = localStorage.getItem('planner_music_source_type');
+        if (savedMusicSourceType === 'youtube' || savedMusicSourceType === 'synth') {
+          setMusicSourceType(savedMusicSourceType);
+        }
+        const savedCustomTracks = localStorage.getItem('planner_custom_tracks');
+        if (savedCustomTracks) {
+          try {
+            setCustomTracks(JSON.parse(savedCustomTracks));
+          } catch {}
         }
       } catch {
         // Ignore localStorage read errors
@@ -781,6 +800,15 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         if (cloud.youtubeVideoId) {
           setYoutubeVideoId(cloud.youtubeVideoId);
         }
+        if (cloud.currentTrackTitle) {
+          setCurrentTrackTitle(cloud.currentTrackTitle);
+        }
+        if (cloud.musicSourceType) {
+          setMusicSourceType(cloud.musicSourceType);
+        }
+        if (cloud.customTracks && Array.isArray(cloud.customTracks)) {
+          setCustomTracks(cloud.customTracks);
+        }
         if (cloud.lifeScores && typeof cloud.lifeScores === 'object') {
           setLifeScores(cloud.lifeScores);
         }
@@ -801,6 +829,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           yearData: yearly,
           themeId,
           youtubeVideoId,
+          currentTrackTitle,
+          musicSourceType,
+          customTracks,
           lifeScores,
           notificationSettings,
           updatedAt: new Date().toISOString()
@@ -926,6 +957,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(notifKey, JSON.stringify(notificationSettings));
       localStorage.setItem(themeKey, themeId);
       if (youtubeVideoId) localStorage.setItem('planner_youtube_id', youtubeVideoId);
+      localStorage.setItem('planner_track_title', currentTrackTitle);
+      localStorage.setItem('planner_music_source_type', musicSourceType);
+      localStorage.setItem('planner_custom_tracks', JSON.stringify(customTracks));
 
       // Nếu là khách (chưa đăng nhập), cập nhật key mặc định
       if (!email) {
@@ -967,6 +1001,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           yearData: yearly,
           themeId,
           youtubeVideoId,
+          currentTrackTitle,
+          musicSourceType,
+          customTracks,
           lifeScores,
           notificationSettings,
           updatedAt: new Date().toISOString()
@@ -999,7 +1036,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, lifeScores, notificationSettings, user]);
+  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, currentTrackTitle, musicSourceType, customTracks, lifeScores, notificationSettings, user]);
 
   // Đăng nhập người dùng cục bộ (dành cho fallback offline hoặc khi chưa có mạng)
   const login = (email: string, name: string) => {
@@ -1102,6 +1139,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         yearData: yearly,
         themeId,
         youtubeVideoId,
+        currentTrackTitle,
+        musicSourceType,
+        customTracks,
         lifeScores,
         notificationSettings,
         updatedAt: new Date().toISOString()
@@ -1212,7 +1252,27 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const playCustomYoutubeUrl = (url: string): boolean => {
+  const removeCustomTrack = (id: string) => {
+    setCustomTracks((prev) => prev.filter((t) => t.id !== id));
+    triggerToast('Đã xóa bài hát khỏi danh sách của bạn');
+  };
+
+  const playCustomTrack = (track: CustomTrack) => {
+    if (oscRef.current) {
+      try {
+        oscRef.current.stop();
+        oscRef.current.disconnect();
+        oscRef.current = null;
+      } catch {}
+    }
+    setMusicSourceType('youtube');
+    setYoutubeVideoId(track.videoId);
+    setCurrentTrackTitle(track.title);
+    setIsPlayingMusic(true);
+    triggerToast(`Đang phát: ${track.title}`);
+  };
+
+  const playCustomYoutubeUrl = (url: string, customTitle?: string): boolean => {
     const id = extractYouTubeVideoId(url);
     if (!id) {
       triggerToast('Link YouTube không hợp lệ, vui lòng kiểm tra lại!');
@@ -1225,11 +1285,25 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         oscRef.current = null;
       } catch {}
     }
+    const resolvedTitle = customTitle?.trim() || `YouTube Chill (${id})`;
     setMusicSourceType('youtube');
     setYoutubeVideoId(id);
-    setCurrentTrackTitle(`YouTube Lofi (${id})`);
+    setCurrentTrackTitle(resolvedTitle);
     setIsPlayingMusic(true);
-    triggerToast(`Đang phát nhạc nền từ YouTube!`);
+
+    // Lưu bài hát vào danh sách customTracks (đưa lên đầu, tối đa 8 bài)
+    setCustomTracks((prev) => {
+      const filtered = prev.filter((t) => t.videoId !== id);
+      const newTrack: CustomTrack = {
+        id: `yt-${id}-${Date.now()}`,
+        title: resolvedTitle,
+        videoId: id,
+        addedAt: new Date().toISOString()
+      };
+      return [newTrack, ...filtered].slice(0, 8);
+    });
+
+    triggerToast(`Đang phát: ${resolvedTitle}`);
     return true;
   };
 
@@ -1257,6 +1331,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         goals,
         yearly,
         youtubeVideoId,
+        currentTrackTitle,
+        musicSourceType,
+        customTracks,
         lifeScores,
         notificationSettings
       };
@@ -1289,6 +1366,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       if (parsed.yearly && Array.isArray(parsed.yearly.months)) setYearly(parsed.yearly);
       if (parsed.themeId && typeof parsed.themeId === 'string') setThemeId(parsed.themeId);
       if (parsed.youtubeVideoId) setYoutubeVideoId(parsed.youtubeVideoId);
+      if (parsed.currentTrackTitle && typeof parsed.currentTrackTitle === 'string') setCurrentTrackTitle(parsed.currentTrackTitle);
+      if (parsed.musicSourceType) setMusicSourceType(parsed.musicSourceType);
+      if (Array.isArray(parsed.customTracks)) setCustomTracks(parsed.customTracks);
       if (parsed.lifeScores && typeof parsed.lifeScores === 'object') setLifeScores(parsed.lifeScores);
       if (parsed.notificationSettings && typeof parsed.notificationSettings === 'object') setNotificationSettings(parsed.notificationSettings);
 
@@ -1900,6 +1980,10 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setShowMusicPopover,
     playPresetTrack,
     playCustomYoutubeUrl,
+    customTracks,
+    setCustomTracks,
+    removeCustomTrack,
+    playCustomTrack,
     tasks,
     setTasks,
     habits,

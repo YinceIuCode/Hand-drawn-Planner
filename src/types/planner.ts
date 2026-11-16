@@ -105,6 +105,13 @@ export interface MusicTrackPreset {
   freq?: number;
 }
 
+export interface CustomTrack {
+  id: string;
+  title: string;
+  videoId: string;
+  addedAt: string;
+}
+
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
 export interface User {
@@ -130,6 +137,9 @@ export interface CloudPlannerState {
   yearData: YearData;
   themeId: string;
   youtubeVideoId?: string | null;
+  currentTrackTitle?: string;
+  musicSourceType?: 'youtube' | 'synth';
+  customTracks?: CustomTrack[];
   lifeScores?: Record<string, number>;
   notificationSettings?: NotificationSettings;
   updatedAt?: string;
@@ -144,6 +154,10 @@ export interface PlannerBackupData {
   goals: Goal[];
   yearly?: YearData;
   youtubeVideoId?: string | null;
+  currentTrackTitle?: string;
+  musicSourceType?: 'youtube' | 'synth';
+  customTracks?: CustomTrack[];
   lifeScores?: Record<string, number>;
   notificationSettings?: NotificationSettings;
+  user?: User | null;
 }

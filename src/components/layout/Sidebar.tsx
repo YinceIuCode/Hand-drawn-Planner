@@ -47,6 +47,9 @@ export default function Sidebar() {
     setShowMusicPopover,
     playPresetTrack,
     playCustomYoutubeUrl,
+    customTracks,
+    removeCustomTrack,
+    playCustomTrack,
     showDataModal,
     setShowDataModal,
     showNotificationModal,
@@ -61,6 +64,7 @@ export default function Sidebar() {
   } = usePlanner();
 
   const [youtubeInput, setYoutubeInput] = useState<string>('');
+  const [customTitleInput, setCustomTitleInput] = useState<string>('');
   const desktopAsideRef = useRef<HTMLElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -85,9 +89,10 @@ export default function Sidebar() {
   const handleCustomYoutubeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!youtubeInput.trim()) return;
-    const success = playCustomYoutubeUrl(youtubeInput);
+    const success = playCustomYoutubeUrl(youtubeInput, customTitleInput);
     if (success) {
       setYoutubeInput('');
+      setCustomTitleInput('');
       setShowMusicPopover(false);
     }
   };
@@ -145,10 +150,71 @@ export default function Sidebar() {
             className="sketch-btn px-3 py-1.5 text-white text-xs font-bold shrink-0"
             style={{ backgroundColor: currentTheme.primary }}
           >
-            Phát
+            Phát & Lưu
           </button>
         </div>
+        <input
+          type="text"
+          value={customTitleInput}
+          onChange={(e) => setCustomTitleInput(e.target.value)}
+          placeholder="Tên bài hát (tùy chọn)..."
+          className="sketch-input w-full px-2.5 py-1 text-[11px] bg-white focus:outline-none placeholder:text-gray-400"
+        />
       </form>
+
+      {/* Danh sách bài hát người dùng đã thêm gần đây */}
+      {customTracks && customTracks.length > 0 && (
+        <div className="space-y-1.5 pt-2 mt-2 border-t-2 border-dashed border-gray-200">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold block opacity-75">
+              Bài hát của bạn ({customTracks.length}):
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium">Đã nhớ</span>
+          </div>
+          <div className="space-y-1 max-h-[135px] overflow-y-auto pr-0.5">
+            {customTracks.map((track) => {
+              const isCurrent =
+                musicSourceType === 'youtube' && youtubeVideoId === track.videoId;
+
+              return (
+                <div
+                  key={track.id}
+                  className={`group w-full p-1.5 rounded-xl border text-xs flex items-center justify-between gap-1.5 transition-all ${
+                    isCurrent
+                      ? 'border-black font-extrabold bg-gray-100 shadow-xs'
+                      : 'border-gray-200 hover:border-gray-400 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <button
+                    onClick={() => {
+                      playCustomTrack(track);
+                      onClose();
+                    }}
+                    className="truncate flex items-center gap-1.5 flex-1 text-left min-w-0"
+                    title={`Phát: ${track.title}`}
+                  >
+                    <YouTubeIcon className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                    <span className="truncate">{track.title}</span>
+                    {isCurrent && isPlayingMusic && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 ml-0.5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeCustomTrack(track.id);
+                    }}
+                    className="p-1 opacity-40 hover:opacity-100 rounded text-red-500 hover:bg-red-50 shrink-0 transition-all"
+                    title="Xóa bài này"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 5 kênh gợi ý trực tiếp */}
       <div className="space-y-1.5 pt-2.5 mt-2.5 border-t-2 border-dashed border-gray-200">
