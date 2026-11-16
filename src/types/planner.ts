@@ -115,6 +115,14 @@ export interface User {
   loggedInAt?: string;
 }
 
+export interface NotificationSettings {
+  enabled: boolean;
+  morningTime: string;
+  eveningTime: string;
+  lastMorningNotifiedDate?: string;
+  lastEveningNotifiedDate?: string;
+}
+
 export interface CloudPlannerState {
   tasks: Task[];
   habits: Habit[];
@@ -123,6 +131,7 @@ export interface CloudPlannerState {
   themeId: string;
   youtubeVideoId?: string | null;
   lifeScores?: Record<string, number>;
+  notificationSettings?: NotificationSettings;
   updatedAt?: string;
 }
 
@@ -136,4 +145,5 @@ export interface PlannerBackupData {
   yearly?: YearData;
   youtubeVideoId?: string | null;
   lifeScores?: Record<string, number>;
+  notificationSettings?: NotificationSettings;
 }

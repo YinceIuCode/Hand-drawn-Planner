@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Solid sketch drop-shadow (offset to bottom-right/left) -->
+  <!-- Solid sketch drop-shadow -->
   <rect
     x="11"
     y="10"
@@ -7,7 +7,7 @@
     height="48"
     rx="10"
     transform="rotate(-2 35 34)"
-    fill="#14241d"
+    fill="#1a1a1a"
   />
   <!-- Main hand-drawn green card -->
   <rect
@@ -17,8 +17,8 @@
     height="48"
     rx="10"
     transform="rotate(-2 32 30)"
-    fill="#0f6848"
-    stroke="#16251f"
+    fill="#1b5e43"
+    stroke="#1a1a1a"
     stroke-width="3.5"
     stroke-linejoin="round"
   />

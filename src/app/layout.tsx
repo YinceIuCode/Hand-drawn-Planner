@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,19 +12,34 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1b5e43",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "Hand-drawn Planner · Sổ tay vẽ tay & Kế hoạch cá nhân",
-  description: "Sổ tay kỹ thuật số vẽ tay (Hand-drawn Digital Notebook) - Quản lý mục tiêu, kế hoạch tuần, theo dõi thói quen và thư giãn cùng nhạc Lofi.",
+  description:
+    "Sổ tay kỹ thuật số vẽ tay (Hand-drawn Digital Notebook) - Quản lý mục tiêu, kế hoạch tuần, theo dõi thói quen và thư giãn cùng nhạc Lofi.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Planner",
+  },
   icons: {
-    icon: [
-      { url: "/icon.svg?v=3", type: "image/svg+xml" },
-      { url: "/favicon.ico?v=3" }
-    ],
-    apple: "/icon.svg?v=3"
+    icon: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"

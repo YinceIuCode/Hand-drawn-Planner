@@ -391,3 +391,9 @@ export const playLofiChord = () => {
     // Ignore audio error
   }
 };
+
+export const DEFAULT_NOTIFICATION_SETTINGS = {
+  enabled: false,
+  morningTime: '08:00',
+  eveningTime: '21:30'
+};

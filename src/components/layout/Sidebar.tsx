@@ -4,12 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles, Target, CheckCircle2, Calendar, Mountain, BarChart3,
   Music, Volume2, Play, Pause, Menu, X, Palette,
-  Database, SlidersHorizontal, Radio, UserCheck, LogOut, User as UserIcon
+  Database, SlidersHorizontal, Radio, UserCheck, LogOut, User as UserIcon, Bell
 } from 'lucide-react';
 import { usePlanner } from '@/context/PlannerContext';
 import { THEMES, CHILL_PRESETS } from '@/lib/constants';
 import DataManagementModal from '@/components/layout/DataManagementModal';
 import AuthModal from '@/components/layout/AuthModal';
+import NotificationModal from '@/components/layout/NotificationModal';
 
 const YouTubeIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -48,6 +49,9 @@ export default function Sidebar() {
     playCustomYoutubeUrl,
     showDataModal,
     setShowDataModal,
+    showNotificationModal,
+    setShowNotificationModal,
+    notificationSettings,
     user,
     showAuthModal,
     setShowAuthModal,
@@ -299,6 +303,18 @@ export default function Sidebar() {
             )}
           </button>
 
+          {/* Nút Nhắc nhở & Cài đặt App (PWA) trên Mobile */}
+          <button
+            onClick={() => setShowNotificationModal(true)}
+            className="sketch-btn p-2 bg-white relative"
+            title="Nhắc nhở & Cài đặt App (PWA)"
+          >
+            <Bell className="w-4 h-4" style={{ color: currentTheme.primary }} />
+            {notificationSettings.enabled && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            )}
+          </button>
+
           {/* Menu Drawer Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -451,7 +467,19 @@ export default function Sidebar() {
             </button>
           </div>
 
-          {/* 3. Nút Sao lưu & Khôi phục dữ liệu */}
+          {/* 3. Nhắc nhở & Cài đặt PWA */}
+          <button
+            onClick={() => {
+              setShowNotificationModal(true);
+              setMobileMenuOpen(false);
+            }}
+            className="w-full sketch-btn p-2.5 bg-white hover:bg-gray-50 text-xs font-bold flex items-center justify-center gap-2"
+          >
+            <Bell className="w-4 h-4" style={{ color: currentTheme.primary }} />
+            <span>Nhắc nhở & Cài đặt App (PWA)</span>
+          </button>
+
+          {/* 4. Nút Sao lưu & Khôi phục dữ liệu */}
           <button
             onClick={() => {
               setShowDataModal(true);
@@ -535,14 +563,27 @@ export default function Sidebar() {
               </div>
             </div>
 
-            {/* Nút Cài đặt & Quản lý dữ liệu (Modal Export/Import JSON) */}
-            <button
-              onClick={() => setShowDataModal(true)}
-              className="sketch-btn p-1.5 bg-white text-xs hover:bg-gray-50 opacity-75 hover:opacity-100 transition-all"
-              title="Cài đặt & Quản lý dữ liệu (Export/Import/Reset)"
-            >
-              <Database className="w-4 h-4" style={{ color: currentTheme.primary }} />
-            </button>
+            {/* Cụm nút Nhắc nhở/PWA & Cài đặt dữ liệu */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowNotificationModal(true)}
+                className="sketch-btn p-1.5 bg-white text-xs hover:bg-gray-50 opacity-75 hover:opacity-100 transition-all relative"
+                title="Nhắc nhở & Cài đặt Ứng dụng (PWA)"
+              >
+                <Bell className="w-4 h-4" style={{ color: currentTheme.primary }} />
+                {notificationSettings.enabled && (
+                  <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowDataModal(true)}
+                className="sketch-btn p-1.5 bg-white text-xs hover:bg-gray-50 opacity-75 hover:opacity-100 transition-all"
+                title="Cài đặt & Quản lý dữ liệu (Export/Import/Reset)"
+              >
+                <Database className="w-4 h-4" style={{ color: currentTheme.primary }} />
+              </button>
+            </div>
           </div>
 
           {/* 6 Mục điều hướng chính trên Desktop */}
@@ -845,6 +886,12 @@ export default function Sidebar() {
       <DataManagementModal
         isOpen={showDataModal}
         onClose={() => setShowDataModal(false)}
+      />
+
+      {/* Modal Nhắc nhở & Cài đặt Ứng dụng PWA */}
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
       />
 
       {/* Modal Đăng nhập & Đồng bộ Tài khoản */}

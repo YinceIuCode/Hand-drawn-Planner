@@ -9,7 +9,7 @@ import React, {
   useEffect,
   ReactNode
 } from 'react';
-import { Task, Habit, Goal, GoalStep, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState } from '@/types/planner';
+import { Task, Habit, Goal, GoalStep, YearData, Theme, TabId, PlannerBackupData, User, SyncStatus, CloudPlannerState, NotificationSettings } from '@/types/planner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   THEMES,
@@ -23,7 +23,8 @@ import {
   getFullDayOfWeekLabel,
   extractYouTubeVideoId,
   calculateStreak,
-  DEFAULT_LIFE_SCORES
+  DEFAULT_LIFE_SCORES,
+  DEFAULT_NOTIFICATION_SETTINGS
 } from '@/lib/constants';
 
 // ============================================================================
@@ -478,6 +479,18 @@ export interface PlannerContextType {
   deleteYearlyItem: (monthNum: number, itemId: string) => void;
   toggleYearlyItem: (monthNum: number, itemId: string) => void;
   updateYearlyMeta: (keyword: string, vision: string) => void;
+
+  // Notifications & PWA
+  showNotificationModal: boolean;
+  setShowNotificationModal: React.Dispatch<React.SetStateAction<boolean>>;
+  notificationSettings: NotificationSettings;
+  setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
+  updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
+  sendTestNotification: () => Promise<boolean>;
+  canInstallPwa: boolean;
+  installPwa: () => Promise<void>;
+  isPwaInstalled: boolean;
+  isIOSDevice: boolean;
 }
 
 const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
@@ -496,6 +509,17 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
 
   // Modal quản lý dữ liệu
   const [showDataModal, setShowDataModal] = useState<boolean>(false);
+
+  // Modal Nhắc nhở & Cài đặt Ứng dụng (PWA)
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+
+  // PWA states
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deferredPromptRef = useRef<any>(null);
+  const [canInstallPwa, setCanInstallPwa] = useState<boolean>(false);
+  const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(false);
+  const [isIOSDevice, setIsIOSDevice] = useState<boolean>(false);
 
   // Modal & Trạng thái Tài khoản người dùng (User & Auth)
   const [user, setUser] = useState<User | null>(null);
@@ -606,6 +630,17 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           setLifeScores(JSON.parse(savedLifeScores));
         }
 
+        const notifKey = getUserStorageKey('notification_settings', initialEmail);
+        const savedNotif = localStorage.getItem(notifKey);
+        if (savedNotif) {
+          setNotificationSettings(JSON.parse(savedNotif));
+        } else {
+          const guestNotif = localStorage.getItem('planner_notification_settings');
+          if (guestNotif) {
+            setNotificationSettings(JSON.parse(guestNotif));
+          }
+        }
+
         const savedYoutube = localStorage.getItem('planner_youtube_id');
         if (savedYoutube) {
           setYoutubeVideoId(savedYoutube);
@@ -615,6 +650,53 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       }
     }, 0);
     return () => clearTimeout(mountTimer);
+  }, []);
+
+  // Đăng ký Service Worker và lắng nghe sự kiện cài đặt PWA (chạy phía client)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Đăng ký Service Worker thất bại:', err);
+      });
+    }
+
+    const checkTimer = setTimeout(() => {
+      const isIOS =
+        /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+        !(window as unknown as { MSStream?: unknown }).MSStream;
+      setIsIOSDevice(isIOS);
+
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (navigator as unknown as { standalone?: boolean }).standalone === true;
+      if (isStandalone) {
+        setIsPwaInstalled(true);
+      }
+    }, 0);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setCanInstallPwa(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true);
+      setCanInstallPwa(false);
+      deferredPromptRef.current = null;
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      clearTimeout(checkTimer);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
   // Lưu trạng thái vào localStorage khi state thay đổi (phân tách theo email nếu đã đăng nhập)
@@ -702,6 +784,9 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         if (cloud.lifeScores && typeof cloud.lifeScores === 'object') {
           setLifeScores(cloud.lifeScores);
         }
+        if (cloud.notificationSettings && typeof cloud.notificationSettings === 'object') {
+          setNotificationSettings(cloud.notificationSettings);
+        }
 
         setSyncStatus('synced');
         if (shouldNotify) {
@@ -717,6 +802,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           themeId,
           youtubeVideoId,
           lifeScores,
+          notificationSettings,
           updatedAt: new Date().toISOString()
         };
 
@@ -829,6 +915,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       const goalsKey = getUserStorageKey('goals', email);
       const yearlyKey = getUserStorageKey('yearly', email);
       const lifeScoresKey = getUserStorageKey('life_scores', email);
+      const notifKey = getUserStorageKey('notification_settings', email);
       const themeKey = getUserStorageKey('theme', email);
 
       localStorage.setItem(tasksKey, JSON.stringify(tasks));
@@ -836,6 +923,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(goalsKey, JSON.stringify(goals));
       localStorage.setItem(yearlyKey, JSON.stringify(yearly));
       localStorage.setItem(lifeScoresKey, JSON.stringify(lifeScores));
+      localStorage.setItem(notifKey, JSON.stringify(notificationSettings));
       localStorage.setItem(themeKey, themeId);
       if (youtubeVideoId) localStorage.setItem('planner_youtube_id', youtubeVideoId);
 
@@ -846,6 +934,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('planner_goals', JSON.stringify(goals));
         localStorage.setItem('planner_yearly', JSON.stringify(yearly));
         localStorage.setItem('planner_life_scores', JSON.stringify(lifeScores));
+        localStorage.setItem('planner_notification_settings', JSON.stringify(notificationSettings));
         localStorage.setItem('planner_theme', themeId);
       }
     } catch {
@@ -879,6 +968,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           themeId,
           youtubeVideoId,
           lifeScores,
+          notificationSettings,
           updatedAt: new Date().toISOString()
         };
 
@@ -909,7 +999,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, lifeScores, user]);
+  }, [tasks, habits, goals, yearly, themeId, youtubeVideoId, lifeScores, notificationSettings, user]);
 
   // Đăng nhập người dùng cục bộ (dành cho fallback offline hoặc khi chưa có mạng)
   const login = (email: string, name: string) => {
@@ -1013,6 +1103,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         themeId,
         youtubeVideoId,
         lifeScores,
+        notificationSettings,
         updatedAt: new Date().toISOString()
       };
       const { error } = await supabase.from('user_planner_data').upsert(
@@ -1166,7 +1257,8 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         goals,
         yearly,
         youtubeVideoId,
-        lifeScores
+        lifeScores,
+        notificationSettings
       };
       const jsonStr = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -1198,6 +1290,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       if (parsed.themeId && typeof parsed.themeId === 'string') setThemeId(parsed.themeId);
       if (parsed.youtubeVideoId) setYoutubeVideoId(parsed.youtubeVideoId);
       if (parsed.lifeScores && typeof parsed.lifeScores === 'object') setLifeScores(parsed.lifeScores);
+      if (parsed.notificationSettings && typeof parsed.notificationSettings === 'object') setNotificationSettings(parsed.notificationSettings);
 
       triggerToast('Đã khôi phục dữ liệu từ file sao lưu thành công!');
       return true;
@@ -1216,6 +1309,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setGoals(INITIAL_GOALS);
     setYearly(INITIAL_YEAR_DATA);
     setLifeScores(DEFAULT_LIFE_SCORES);
+    setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
     setSelectedDate(today);
     triggerToast('Đã khôi phục toàn bộ dữ liệu mẫu ban đầu!');
   };
@@ -1225,6 +1319,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setHabits([]);
     setGoals([]);
     setLifeScores(DEFAULT_LIFE_SCORES);
+    setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
     setYearly({
       keyword: 'Mục tiêu mới',
       vision: 'Bắt đầu ghi chép kế hoạch cá nhân của bạn...',
@@ -1619,6 +1714,151 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setYearly((prev) => ({ ...prev, keyword, vision }));
   };
 
+  // ============================================================================
+  // HỆ THỐNG THÔNG BÁO & NHẮC NHỞ WEB (NOTIFICATIONS & PWA)
+  // ============================================================================
+  const triggerSystemNotification = async (title: string, options: NotificationOptions) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    if (Notification.permission !== 'granted') return false;
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && reg.showNotification) {
+          await reg.showNotification(title, {
+            icon: '/icon.svg',
+            badge: '/icon.svg',
+            ...options
+          });
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('SW showNotification error:', err);
+    }
+
+    try {
+      new Notification(title, {
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        ...options
+      });
+      return true;
+    } catch (err) {
+      console.warn('Notification constructor error:', err);
+      return false;
+    }
+  };
+
+  const updateNotificationSettings = async (partial: Partial<NotificationSettings>) => {
+    if (partial.enabled && typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          triggerToast('Bạn chưa cấp quyền thông báo cho trình duyệt.');
+          setNotificationSettings((prev) => ({ ...prev, enabled: false }));
+          return;
+        }
+      }
+    }
+    setNotificationSettings((prev) => ({ ...prev, ...partial }));
+    triggerToast('Đã lưu cài đặt thông báo!');
+  };
+
+  const sendTestNotification = async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      triggerToast('Trình duyệt không hỗ trợ thông báo hệ thống.');
+      return false;
+    }
+
+    let permission = Notification.permission;
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission !== 'granted') {
+      triggerToast('Bạn chưa cấp quyền thông báo cho trình duyệt.');
+      return false;
+    }
+
+    const remainingTasksCount = todaysTasks.filter((t) => !t.completed).length;
+    const doneHabitsCount = habits.filter((h) => h.daysDone.includes(selectedDayNumber)).length;
+
+    const success = await triggerSystemNotification('🔔 Nhắc nhở Planner (Thông báo thử)', {
+      body: `Hôm nay bạn còn ${remainingTasksCount} việc chưa xong và đã hoàn thành ${doneHabitsCount}/${habits.length} thói quen!`,
+      tag: 'planner-test-reminder'
+    });
+
+    if (success) {
+      triggerToast('Đã gửi thông báo thử nghiệm thành công!');
+    } else {
+      triggerToast('Không thể gửi thông báo, vui lòng kiểm tra quyền trình duyệt.');
+    }
+    return success;
+  };
+
+  const installPwa = async () => {
+    if (!deferredPromptRef.current) return;
+    deferredPromptRef.current.prompt();
+    const { outcome } = await deferredPromptRef.current.userChoice;
+    if (outcome === 'accepted') {
+      setIsPwaInstalled(true);
+      setCanInstallPwa(false);
+      triggerToast('Cài đặt ứng dụng Planner thành công!');
+    }
+    deferredPromptRef.current = null;
+  };
+
+  // Bộ đếm kiểm tra mỗi 30 giây để tự động nhắc sáng / tối
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkInterval = setInterval(async () => {
+      if (!notificationSettings.enabled) return;
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const currentTime = `${hours}:${minutes}`;
+      const todayStr = getTodayString();
+
+      // 1. Nhắc buổi sáng
+      if (
+        currentTime === notificationSettings.morningTime &&
+        notificationSettings.lastMorningNotifiedDate !== todayStr
+      ) {
+        setNotificationSettings((prev) => ({
+          ...prev,
+          lastMorningNotifiedDate: todayStr
+        }));
+        const remainingTasks = todaysTasks.filter((t) => !t.completed).length;
+        await triggerSystemNotification('☀️ Chào buổi sáng từ Planner!', {
+          body: `Hôm nay bạn có ${remainingTasks} việc cần hoàn thành trong sổ tay. Chúc bạn một ngày năng suất!`,
+          tag: `planner-morning-${todayStr}`
+        });
+      }
+
+      // 2. Nhắc buổi tối
+      if (
+        currentTime === notificationSettings.eveningTime &&
+        notificationSettings.lastEveningNotifiedDate !== todayStr
+      ) {
+        setNotificationSettings((prev) => ({
+          ...prev,
+          lastEveningNotifiedDate: todayStr
+        }));
+        const doneHabits = habits.filter((h) => h.daysDone.includes(selectedDayNumber)).length;
+        await triggerSystemNotification('🌙 Đừng quên tổng kết ngày nhé!', {
+          body: `Đừng quên tổng kết ngày và tích ${doneHabits}/${habits.length} thói quen hôm nay nhé!`,
+          tag: `planner-evening-${todayStr}`
+        });
+      }
+    }, 30000);
+
+    return () => clearInterval(checkInterval);
+  }, [notificationSettings, todaysTasks, habits, selectedDayNumber]);
+
   const value: PlannerContextType = {
     themeId,
     setThemeId,
@@ -1732,7 +1972,17 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     addYearlyItem,
     deleteYearlyItem,
     toggleYearlyItem,
-    updateYearlyMeta
+    updateYearlyMeta,
+    showNotificationModal,
+    setShowNotificationModal,
+    notificationSettings,
+    setNotificationSettings,
+    updateNotificationSettings,
+    sendTestNotification,
+    canInstallPwa,
+    installPwa,
+    isPwaInstalled,
+    isIOSDevice
   };
 
   return <PlannerContext.Provider value={value}>{children}</PlannerContext.Provider>;
